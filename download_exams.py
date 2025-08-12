@@ -353,23 +353,56 @@ class PhDExamDownloader:
             bool: True if download was successful, False otherwise
         """
         try:
-            # Generate filename from the PDF URL or page URL
-            filename = os.path.basename(pdf_url)
-            if not filename.lower().endswith('.pdf'):
-                # Extract a meaningful name from the page URL
+            # Download the file
+            print(f"Downloading {pdf_url}")
+            response = self.session.get(pdf_url, stream=True)
+            response.raise_for_status()
+
+            filename = None
+            # 1. Try to get filename from Content-Disposition header
+            content_disposition = response.headers.get('Content-Disposition')
+            if content_disposition:
+                fname_match = re.search(r'filename\*?=([^;]+)', content_disposition)
+                if fname_match:
+                    try:
+                        # Decode filename according to RFC 5987
+                        header_filename = urllib.parse.unquote(fname_match.group(1).strip().strip("'\""))
+                        if header_filename.lower().endswith('.pdf'):
+                            filename = header_filename
+                    except Exception as e:
+                        print(f"Warning: Could not decode Content-Disposition filename: {e}")
+
+            # 2. If not found in header, try to extract from PDF URL
+            if not filename:
+                url_path = urllib.parse.urlparse(pdf_url).path
+                url_filename = os.path.basename(url_path)
+                if url_filename and url_filename.lower().endswith('.pdf'):
+                    filename = url_filename
+                
+            # 3. Fallback to generating from page URL
+            if not filename:
                 page_name = os.path.basename(page_url).replace('.html', '').replace('/', '-')
                 filename = f"{page_name}.pdf"
             
-            # Clean up filename
-            filename = re.sub(r'[\\/:*?"<>|]', '-', filename)  # Remove invalid filename characters
-            
+            # 4. Sanitize filename
+            # Remove invalid characters for Windows filenames
+            filename = re.sub(r'[\\/:*?"<>|]', '-', filename)
+            # Replace multiple dashes with a single one
+            filename = re.sub(r'-+', '-', filename)
+            # Remove leading/trailing dashes
+            filename = filename.strip('-')
+            # Ensure it ends with .pdf
+            if not filename.lower().endswith('.pdf'):
+                filename = f"{filename}.pdf"
+
+            # 5. Ensure filename is not empty or just ".pdf"
+            if not filename or filename.lower() == '.pdf':
+                filename = f"{str(uuid.uuid4())}.pdf" # Use UUID as a fallback
+
             # Full path to save the file
             filepath = os.path.join(self.destination_folder, filename)
             
-            # Download the file
-            print(f"Downloading {pdf_url} to {filepath}")
-            response = self.session.get(pdf_url, stream=True)
-            response.raise_for_status()
+            print(f"Saving to {filepath}")
             
             # Check if it's actually a PDF
             content_type = response.headers.get('Content-Type', '')

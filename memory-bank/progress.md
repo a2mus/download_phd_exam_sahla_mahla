@@ -20,9 +20,13 @@ This file tracks the project's progress using a task list format.
 * Added functionality to organize images in dedicated subfolders
 * Updated CLI and README to reflect new image downloading capabilities
 
-## Current Tasks
+* Implemented robust PDF filename generation and sanitization to prevent invalid filename errors
+* Added fallback mechanisms for filename generation (Content-Disposition, URL, page URL, UUID)
 
-* Memory bank updates for image downloading functionality
+* Debugged and resolved the "response variable not defined" error in `download_pdf`
+* Added `.gitignore` file to ignore the `exams/` directory
+
+## Current Tasks
 
 ## Next Steps
 
